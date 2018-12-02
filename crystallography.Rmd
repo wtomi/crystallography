@@ -1,0 +1,22 @@
+---
+title: "Crystallography data analysis"
+author: "Tomi"
+date: "December 2, 2018"
+output: html_document
+---
+
+```{r, echo=F, message=F}
+library(dplyr)
+```
+
+
+```{r, echo=F}
+cols_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
+
+df <- read.csv2("all_summary.csv", nrow=1000) %>%
+  filter(!res_name %in% cols_names_to_delete)
+```
+
+```{r}
+summary(df)
+```
