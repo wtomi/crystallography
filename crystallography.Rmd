@@ -10,29 +10,38 @@ output:
 ---
 
 ```{r, echo=F, message=F}
-install.packages("dplyr", "data.table", "mice", "corrplot", "caret")
+#install.packages(c("dplyr", "data.table", "mice", "corrplot", "caret", "DT", "qwraps2"))
 library(dplyr)
 library(data.table)
 library(mice)
 library(corrplot)
 library(caret)
-```
+library(DT)
+library(qwraps2)
 
-
-```{r, echo=F}
-df <- fread("all_summary.csv")
-
-df[is.na(df$res_name),"res_name"] = "NA"
-
-orig_number_of_rows = nrow(df)
-orig_number_of_columns = ncol(df)
-
-cols_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
+res_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
 
 red_cols = c("title", "pbd_code", "res_name", "res_id", "chain_id", "local_BAa", "local_NPa", "local_Ra", "local_RGa", "local_SRGa", "local_CCSa", "local_CCPa", "local_ZOa", "local_ZDa", "local_ZD_minus_a", "local_ZD_plus_a", "local_res_atom_count", "local_res_atom_non_h_count", "local_res_atom_non_h_occupancy_sum", "local_res_atom_non_h_electron_sum", "local_res_atom_non_h_electron_occupancy_sum", "local_res_atom_C_count", "local_res_atom_N_count", "local_res_atom_O_count", "local_res_atom_S_count", "dict_atom_non_h_count", "dict_atom_non_h_electron_sum", "dict_atom_C_count", "dict_atom_N_count", "dict_atom_O_count", "dict_atom_S_count", "fo_col", "fc_col", "weight_col", "grid_space", "solvent_radius", "solvent_opening_radius", "part_step_FoFc_std_min", "part_step_FoFc_std_max", "part_step_FoFc_std_step")
 
-df <- df %>% filter(!res_name %in% cols_names_to_delete)
+file_name <- "all_summary.csv"
 
+df <- fread("all_summary.csv")
+
+orig_number_of_rows <- nrow(df)
+orig_number_of_columns <- ncol(df)
+
+df <- df %>% filter(!res_name %in% res_names_to_delete)
+```
+
+#Wstępne przetwarzenie danych
+Ze zbioru danych wczytanego z pliku `r file_name` zostały usunięte wiersze z wartościami atrybutu **res_name** w zbiorze *{`r res_names_to_delete`}*. Podczas wczytywania danych **res_name** równe "NA"
+zostały zastąpione wartościami pustymi, dlatego wartości pustu zostały zastapione odpowiednim łancuchem znakóW
+
+```{r}
+df[is.na(df$res_name),"res_name"] = "NA"
+```
+
+```{r, echo=F, cache=T}
 get_stats_of_most_freq_pattern <- function(data_frame) {
   df_pattern <- md.pattern(data_frame, plot = F)
   ordered_df_pattern <- df_pattern[ order(as.integer(rownames(df_pattern)), decreasing = T, na.last = T), ]
@@ -42,29 +51,62 @@ get_stats_of_most_freq_pattern <- function(data_frame) {
   return(c(prop = prop, ncols_missing = ncols_missing, colnames_missing = colnames_missing))
 }
 
-filter_n_with_most_freq_res_name <- function(df, num) {
-  col_names <- df %>% group_by(res_name) %>% 
-                      summarise(count=n()) %>% 
-                      arrange(desc(count)) %>%
-                      top_n(num) %>%
-                      select(res_name)
-  filtered_df <- df %>% filter(res_name %in% col_names$res_name)
-  return(filtered_df)
-}
+most_freq_pattern_stats <- get_stats_of_most_freq_pattern(df)
 
-#most_freqent_pattern_stats <- get_stats_of_most_freq_pattern(df)
+```
 
-df <- filter_n_with_most_freq_res_name(df, 50)
+##Przetwarzanie brakujących danych
+Analiza wzorców występowania wartości pustych wykazała, że kolumna **`r most_freq_pattern_stats["colnames_missing"]`** jest zawsze pusta. Po usunięci tej kolumny **`r most_freq_pattern_stats["prop"]` %** wierszy jest kompletnych. Proporcja niekompletnych wierszy jest niewielka, więc zostały one usunięte.
 
+```{r}
+df <- df %>% select(-weight_col)
+df <- na.omit(df)
+```
+
+Po tych operacjach w zbiorze nie ma już wartościu pustych.
+
+##50 najczęstszych klas
+
+Do dalszego przetwarzania pozostawione zostaną tylko wiersze, dla których **res_name** (klasa) jest jedną z 50 najczęściej wystepujacyh klas.
+
+```{r, echo=F, message=F, warning=F}
 counted_by_res_names <- df %>%
                         group_by(res_name) %>% 
                         summarise(count=n()) %>%
+                        top_n(50) %>%
                         arrange(desc(count))
 
-df <- df %>% select(-weight_col)
+df <- df %>% filter(res_name %in% counted_by_res_names$res_name)
 
-df <- na.omit(df)
+DT::datatable(counted_by_res_names, style="bootstrap", rownames = F)
+```
 
+#Statystyki
+
+
+```{r, echo=F, message=F}
+number_of_rows <- nrow(df)
+number_of_columns <- ncol(df)
+n_cols_rows = data.frame(liczba_kolumn = c(orig_number_of_columns, number_of_columns),
+                         liczba_wierszy = c(orig_number_of_rows, number_of_rows),
+                         row.names = c("przed wstępnym przetwarzaniem", "po wstępnym przetwarzaniu"))
+```
+##Rozmiar zbioru
+
+`r DT::datatable(n_cols_rows, style="bootstrap", options = list(dom = 't'))`
+
+##Podsumowanie atrybutów
+
+```{r, message=F, warning=F}
+int_num_cols <- as.character((data.frame(name=as.character(colnames(df)), type = sapply(df, class)) %>% filter(type %in% c("numeric","integer")))$name)
+summary_df <- summary( df %>% select(int_num_cols) )
+transposed_summary_df <- transpose(as.data.frame(unclass(summary_df)))
+colnames(transposed_summary_df) <- c("Min", "1st Qu", "Median", "Mean", "3rd Qu", "Max")
+transposed_summary_df <- cbind(Name=colnames(summary_df), transposed_summary_df)
+DT::datatable(transposed_summary_df, style="bootstrap")
+```
+
+```{r, echo=F}
 cols_to_omit <- as.character((data.frame(name=as.character(colnames(df)), type = sapply(df, class)) %>% filter(!type %in% c("numeric","integer")))$name)
 
 df <- df %>% select(-cols_to_omit)
@@ -86,3 +128,10 @@ cor_df2 <- cor(df)
 ```{r}
 summary(df)
 ```
+
+
+
+
+
+
+
