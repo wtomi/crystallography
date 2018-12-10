@@ -2,19 +2,76 @@
 title: "Crystallography data analysis"
 author: "Tomi"
 date: "December 2, 2018"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 ```{r, echo=F, message=F}
 library(dplyr)
+library(data.table)
+library(mice)
+library(corrplot)
+library(caret)
 ```
 
 
 ```{r, echo=F}
+df <- fread("all_summary.csv")
+
+df[is.na(df$res_name),"res_name"] = "NA"
+
+orig_number_of_rows = nrow(df)
+orig_number_of_columns = ncol(df)
+
 cols_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
 
-df <- read.csv2("all_summary.csv", nrow=1000) %>%
-  filter(!res_name %in% cols_names_to_delete)
+df <- df %>% filter(!res_name %in% cols_names_to_delete)
+
+get_stats_of_most_freq_pattern <- function(data_frame) {
+  df_pattern <- md.pattern(data_frame, plot = F)
+  ordered_df_pattern <- df_pattern[ order(as.integer(rownames(df_pattern)), decreasing = T, na.last = T), ]
+  prop <- round((as.integer(rownames(ordered_df_pattern)[1]) / nrow(data_frame)) * 100)
+  ncols_missing <- ordered_df_pattern[1,ncol(ordered_df_pattern)]
+  colnames_missing <- colnames(ordered_df_pattern)[which(ordered_df_pattern[1,] == 0)]
+  return(c(prop = prop, ncols_missing = ncols_missing, colnames_missing = colnames_missing))
+}
+
+filter_n_with_most_freq_res_name <- function(df, num) {
+  col_names <- df %>% group_by(res_name) %>% 
+                      summarise(count=n()) %>% 
+                      arrange(desc(count)) %>%
+                      top_n(num) %>%
+                      select(res_name)
+  filtered_df <- df %>% filter(res_name %in% col_names$res_name)
+  return(filtered_df)
+}
+
+#most_freqent_pattern_stats <- get_stats_of_most_freq_pattern(df)
+
+df <- filter_n_with_most_freq_res_name(df, 50)
+
+counted_by_res_names <- df %>%
+                        group_by(res_name) %>% 
+                        summarise(count=n()) %>%
+                        arrange(desc(count))
+
+df <- df %>% select(-weight_col)
+
+df <- na.omit(df)
+
+cols_to_omit <- as.character((data.frame(name=as.character(colnames(df)), type = sapply(df, class)) %>% filter(!type %in% c("numeric","integer")))$name)
+
+df <- df %>% select(-cols_to_omit)
+
+near_zero_var <- nearZeroVar(df, names = T)
+
+df <- df %>% select(-near_zero_var)
+
+cor_df <- cor(df)
+
 ```
 
 ```{r}
