@@ -10,6 +10,7 @@ output:
 ---
 
 ```{r, echo=F, message=F}
+install.packages("dplyr", "data.table", "mice", "corrplot", "caret")
 library(dplyr)
 library(data.table)
 library(mice)
@@ -27,6 +28,8 @@ orig_number_of_rows = nrow(df)
 orig_number_of_columns = ncol(df)
 
 cols_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
+
+red_cols = c("title", "pbd_code", "res_name", "res_id", "chain_id", "local_BAa", "local_NPa", "local_Ra", "local_RGa", "local_SRGa", "local_CCSa", "local_CCPa", "local_ZOa", "local_ZDa", "local_ZD_minus_a", "local_ZD_plus_a", "local_res_atom_count", "local_res_atom_non_h_count", "local_res_atom_non_h_occupancy_sum", "local_res_atom_non_h_electron_sum", "local_res_atom_non_h_electron_occupancy_sum", "local_res_atom_C_count", "local_res_atom_N_count", "local_res_atom_O_count", "local_res_atom_S_count", "dict_atom_non_h_count", "dict_atom_non_h_electron_sum", "dict_atom_C_count", "dict_atom_N_count", "dict_atom_O_count", "dict_atom_S_count", "fo_col", "fc_col", "weight_col", "grid_space", "solvent_radius", "solvent_opening_radius", "part_step_FoFc_std_min", "part_step_FoFc_std_max", "part_step_FoFc_std_step")
 
 df <- df %>% filter(!res_name %in% cols_names_to_delete)
 
@@ -66,11 +69,17 @@ cols_to_omit <- as.character((data.frame(name=as.character(colnames(df)), type =
 
 df <- df %>% select(-cols_to_omit)
 
-near_zero_var <- nearZeroVar(df, names = T)
+near_zero_var_cols <- nearZeroVar(df, names = T)
 
 df <- df %>% select(-near_zero_var)
 
 cor_df <- cor(df)
+
+correlated_cols_to_remove <- findCorrelation(cor_df, names = T)
+
+df <- df %>% select(-correlated_cols_to_remove)
+
+cor_df2 <- cor(df)
 
 ```
 
