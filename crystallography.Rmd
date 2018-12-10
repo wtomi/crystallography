@@ -112,17 +112,17 @@ DT::datatable(transposed_summary_df, style="bootstrap")
 ```{r, echo=F}
 mean_atoms <- round(mean(df$local_res_atom_non_h_count),2)
 p_atomy <- ggplot(df, aes(local_res_atom_non_h_count)) + geom_density() + ggtitle("Atomy") +  geom_vline(aes(xintercept=mean_atoms), color="red", linetype="dashed", size=1) + 
-   annotate("text",x=mean_atoms,  y=0, label=mean_atoms, color="red", size=4)
+   annotate("text",x=mean_atoms,  y=0.2, label=mean_atoms, color="black", size=4, angle=90)
 
 mean_electrons <- round(mean(df$local_res_atom_non_h_electron_sum),2)
 p_elektorny <- ggplot(df, aes(local_res_atom_non_h_electron_sum)) + geom_density() + ggtitle("Elektrony") + 
   geom_vline(aes(xintercept=mean_electrons), color="red", linetype="dashed", size=1) +
-  annotate("text",x=mean_electrons, y=0, label=mean_electrons, color="red", size=4)
+  annotate("text",x=mean_electrons, y=0.02, label=mean_electrons, color="black", size=4, angle=90)
 
 grid.arrange(p_atomy, p_elektorny, nrow = 1)
 ```
 
-##Zgodnoœæ liczby atomóW 
+##Zgodnoœæ liczby atomów 
 
 ```{r, echo=F, message=F}
 df %>% group_by(res_name) %>% summarise(p_value=(wilcox.test(local_res_atom_non_h_count, dict_atom_non_h_count))$p.value, local_mean = mean(local_res_atom_non_h_count), dict_value=mean(dict_atom_non_h_count)) %>% arrange(p_value) %>% top_n(10) %>% DT::datatable(options = list(dom = 't'))
