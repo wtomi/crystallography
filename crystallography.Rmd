@@ -19,6 +19,7 @@ library(caret)
 library(DT)
 library(plotly)
 library(gridExtra)
+library(tidyr)
 
 res_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
 
@@ -66,7 +67,7 @@ df <- na.omit(df)
 
 Po tych operacjach w zbiorze nie ma ju¿ wartoœciu pustych.
 
-##50 najczêstszych klas
+##Najczêstsze klasy
 
 Do dalszego przetwarzania pozostawione zostan¹ tylko wiersze, dla których **res_name** (klasa) jest jedn¹ z 50 najczêœciej wystepujacyh klas.
 
@@ -119,12 +120,53 @@ p_elektorny <- ggplot(df, aes(local_res_atom_non_h_electron_sum)) + geom_density
   geom_vline(aes(xintercept=mean_electrons), color="red", linetype="dashed", size=1) +
   annotate("text",x=mean_electrons, y=0.02, label=mean_electrons, color="black", size=4, angle=90)
 
-grid.arrange(p_atomy, p_elektorny, nrow = 1)
+ggplotly(p_atomy)
+ggplotly(p_elektorny)
 ```
 
-##Zgodnoœæ liczby atomów 
+##Zgodnoœæ liczby atomów
+
+Zgodnoœæ zasta³a obliczona przy u¿yciu testu Wilcoxsona.
 
 ```{r, echo=F, message=F}
 df %>% group_by(res_name) %>% summarise(p_value=(wilcox.test(local_res_atom_non_h_count, dict_atom_non_h_count))$p.value, local_mean = mean(local_res_atom_non_h_count), dict_value=mean(dict_atom_non_h_count)) %>% arrange(p_value) %>% top_n(10) %>% DT::datatable(options = list(dom = 't'))
 
 ```
+
+##Korelacja
+
+Na ptrzeby policzenia korelacji zostan¹ usuniête kolumny maj¹ce nienumeryczne wartoœci oraz kolumny charakteryzuj¹ce siê wariancj¹ blisk¹ 0.
+
+```{r, echo=F, cache = T}
+cols_to_include <- as.character((data.frame(name=as.character(colnames(df)), type = sapply(df, class)) %>% filter(type %in% c("numeric","integer")))$name)
+
+df_cor <- df %>% select(cols_to_include)
+
+near_zero_var_cols <- nearZeroVar(df_cor, names = T)
+
+df_cor <- df_cor %>% select(-near_zero_var_cols)
+
+cor_matrix <- cor(df_cor)
+```
+
+```{r, echo=F}
+corrplot(cor_matrix, tl.pos="n", type="upper", diag=F, method="color", order="FPC")
+```
+
+#Rozklad atrybutów part_01
+
+```{r, echo=F, cache=T}
+df_part_01 <- df[startsWith(colnames(df), "part_01")]
+df_part_01_tidyr <- df_part_01 %>% gather()
+df_part_01_means <- df_part_01_tidyr %>% group_by(key) %>% summarise(mean_v=mean(value, na.rm = T))
+
+p <- ggplot(df_part_01_tidyr, aes(value)) + 
+  geom_density() + 
+  facet_wrap(~key, scales="free", ncol=3) +
+  geom_vline(aes(xintercept=mean_v), df_part_01_means, color="red", linetype="dashed", size=1) +
+  geom_text(data = df_part_01_means, aes(label = round(mean_v,2), x = mean_v, y = 0),  size=4)
+  
+ggsave("plots.jpeg",p, width=20, height=120, units="cm", limitsize = F)
+```
+
+![part_01 distributions](plots.jpeg)
