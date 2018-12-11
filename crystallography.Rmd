@@ -20,6 +20,7 @@ library(DT)
 library(plotly)
 library(gridExtra)
 library(tidyr)
+library(leaps)
 
 res_names_to_delete = c("UNK", "UNX", "UNL", "DUM", "N", "BLOB", "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE", "LEU", "LYS", "MET", "MSE", "PHE", "PRO", "SEC", "SER", "THR", "TRP", "TYR", "VAL", "DA", "DG", "DT", "DC", "DU", "A", "G", "T", "C", "U", "HOH", "H20", "WAT")
 
@@ -126,7 +127,7 @@ ggplotly(p_elektorny)
 
 ##Zgodnoœæ liczby atomów
 
-Zgodnoœæ zasta³a obliczona przy u¿yciu testu Wilcoxsona.
+Zgodnoœæ miêdzy atrybutami *local_res_atom_non_h_count* oraz *dict_atom_non_h_count* zasta³a obliczona przy u¿yciu testu Wilcoxsona.
 
 ```{r, echo=F, message=F}
 df %>% group_by(res_name) %>% summarise(p_value=(wilcox.test(local_res_atom_non_h_count, dict_atom_non_h_count))$p.value, local_mean = mean(local_res_atom_non_h_count), dict_value=mean(dict_atom_non_h_count)) %>% arrange(p_value) %>% top_n(10) %>% DT::datatable(options = list(dom = 't'))
@@ -153,7 +154,60 @@ cor_matrix <- cor(df_cor)
 corrplot(cor_matrix, tl.pos="n", type="upper", diag=F, method="color", order="FPC")
 ```
 
-#Rozklad atrybutów part_01
+Na wykresie widaæ, ¿e istnieje korelacja miêszy wieloma atrybutami.
+
+#Regresja
+
+Na potrzeby regresji zostana usuniête kolumny, które s¹ ze sob¹ parami skorelowane, tak aby zota³o po jednej kolumnie z takich par.
+
+```{r, echo=F, cache=T}
+
+correlated_cols_to_remove <- findCorrelation(cor_matrix, names = T)
+
+df_reg <- df_cor %>% select(-correlated_cols_to_remove)
+
+df_reg_atom <- cbind(dict_atom_non_h_count=df$dict_atom_non_h_count, df_reg)
+
+```
+
+```{r, echo=F, cache=T}
+
+set.seed(123)
+train.control <- trainControl(method = "cv", number = 10)
+
+step.model_atom <- train(dict_atom_non_h_count ~., data = df_reg_atom,
+                    method = "leapBackward", 
+                    tuneGrid = data.frame(nvmax = 1:30),
+                    trControl = train.control)
+
+rmse_atom <- step.model_atom$results[as.integer(step.model_atom$bestTune),"RMSE"]
+r2_atom <- step.model_atom$results[as.integer(step.model_atom$bestTune),"Rsquared"]
+
+```
+
+```{r, echo=F, cache=T}
+
+df_reg_electron <- cbind(dict_atom_non_h_electron_sum=df$dict_atom_non_h_electron_sum, df_reg)
+
+```
+
+```{r, echo=F, cache=T}
+
+step.model_electron <- train(dict_atom_non_h_electron_sum ~., data = df_reg_electron,
+                    method = "leapBackward", 
+                    tuneGrid = data.frame(nvmax = 1:30),
+                    trControl = train.control)
+
+rmse_electron <- step.model_electron$results[as.integer(step.model_electron$bestTune),"RMSE"]
+r2_electron <- step.model_electron$results[as.integer(step.model_electron$bestTune),"Rsquared"]
+
+```
+
+Dla atomów RMSE: `r rmse_atom` oraz R^2 `r r2_atom`  
+
+Dla elektronów RMSE: `r rmse_electron` oraz R^2 `r r2_electron`
+
+#Rozk³ad atrybutów part_01
 
 ```{r, echo=F, cache=T}
 df_part_01 <- df[startsWith(colnames(df), "part_01")]
@@ -170,3 +224,7 @@ ggsave("plots.jpeg",p, width=20, height=120, units="cm", limitsize = F)
 ```
 
 ![part_01 distributions](plots.jpeg)
+
+
+
+
